@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<style>
+body{margin:0;overflow:hidden;background-color:#1e272e;font-family:sans-serif;}
+canvas{display:block;}
+#ui{position:absolute;top:20px;left:20px;font-size:24px;font-weight:bold;color:#d2dae2;pointer-events:none;}
+.screen{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:32px;color:#d2dae2;text-align:center;pointer-events:none;}
+#gameOver{display:none;}
+#instruction{position:absolute;bottom:20px;width:100%;text-align:center;font-size:16px;color:#808e9b;pointer-events:none;}
+</style>
+</head>
+<body>
+<div id="ui">Score: <span id="score">0</span></div>
+<div id="readyScreen" class="screen">Ready?<br><span style="font-size:20px">點擊畫面開始</span></div>
+<div id="gameOver" class="screen">Crashed<br><span style="font-size:20px">點擊畫面重置</span></div>
+<div id="instruction">操作教學：點擊畫面左/右半邊，或使用左右鍵切換軌道，收集黃色金幣</div>
+<canvas id="gameCanvas"></canvas>
+<script>
+const canvas=document.getElementById('gameCanvas');
+const ctx=canvas.getContext('2d');
+const scoreEl=document.getElementById('score');
+const readyEl=document.getElementById('readyScreen');
+const gameOverEl=document.getElementById('gameOver');
+
+let state='READY';
+let score=0;
+let frames=0;
+let obstacles=[];
+let coins=[];
+const laneCount=3;
+let maxGameWidth=600;
+let gameWidth=0;
+let offsetX=0;
+let laneWidth=0;
+let player={lane:1,w:40,h:40,y:0};
+
+function resizeGame(){
+canvas.width=window.innerWidth;
+canvas.height=window.innerHeight;
+gameWidth=Math.min(canvas.width,maxGameWidth);
+offsetX=(canvas.width-gameWidth)/2;
+laneWidth=gameWidth/laneCount;
+player.y=canvas.height-100;
+}
+resizeGame();
+window.addEventListener('resize',resizeGame);
+
+class Obstacle{
+constructor(lane){
+this.lane=lane;
+this.w=50;
+this.h=50;
+this.y=-this.h;
+this.speed=5+(score*0.1);
+}
+update(){
+this.y+=this.speed;
+}
+draw(){
+let x=offsetX+this.lane*laneWidth+laneWidth/2-this.w/2;
+ctx.fillStyle='#ff3f34';
+ctx.fillRect(x,this.y,this.w,this.h);
+}
+}
+
+class Coin{
+constructor(lane){
+this.lane=lane;
+this.r=15;
+this.y=-this.r*2;
+this.speed=5+(score*0.1);
+}
+update(){
+this.y+=this.speed;
+}
+draw(){
+let x=offsetX+this.lane*laneWidth+laneWidth/2;
+ctx.beginPath();
+ctx.arc(x,this.y,this.r,0,Math.PI*2);
+ctx.fillStyle='#ffd32a';
+ctx.fill();
+}
+}
+
+function resetGame(){
+obstacles=[];
+coins=[];
+score=0;
+scoreEl.innerText=score;
+frames=0;
+player.lane=1;
+state='READY';
+gameOverEl.style.display='none';
+readyEl.style.display='block';
+}
+
+function movePlayer(direction){
+if(direction==='left'&&player.lane>0) player.lane--;
+else if(direction==='right'&&player.lane<laneCount-1) player.lane++;
+}
+
+window.addEventListener('keydown',function(e){
+if(state==='READY'&&e.key.startsWith('Arrow')){
+state='PLAYING';
+readyEl.style.display='none';
+}else if(state==='GAMEOVER'&&e.code==='Space'){
+resetGame();
+}else if(state==='PLAYING'){
+if(e.key==='ArrowLeft') movePlayer('left');
+if(e.key==='ArrowRight') movePlayer('right');
+}
+});
+
+window.addEventListener('mousedown',function(e){
+if(state==='READY'){
+state='PLAYING';
+readyEl.style.display='none';
+}else if(state==='GAMEOVER'){
+resetGame();
+}else if(state==='PLAYING'){
+let rect=canvas.getBoundingClientRect();
+let x=e.clientX-rect.left;
+if(x<canvas.width/2) movePlayer('left');
+else movePlayer('right');
+}
+});
+
+function animate(){
+requestAnimationFrame(animate);
+ctx.fillStyle='#1e272e';
+ctx.fillRect(0,0,canvas.width,canvas.height);
+
+ctx.fillStyle='#2d3436';
+ctx.fillRect(offsetX,0,gameWidth,canvas.height);
+
+if(state==='PLAYING'){
+frames++;
+
+let spawnRate=Math.max(20,60-Math.floor(score/10));
+if(frames%spawnRate===0){
+let safeLane=Math.floor(Math.random()*laneCount);
+for(let i=0;i<laneCount;i++){
+if(i!==safeLane&&(Math.random()>0.3||score>20)){
+obstacles.push(new Obstacle(i));
+}else if(i===safeLane&&Math.random()>0.5){
+coins.push(new Coin(i));
+}
+}
+}
+
+for(let i=coins.length-1;i>=0;i--){
+coins[i].update();
+coins[i].draw();
+let px=offsetX+player.lane*laneWidth+laneWidth/2-player.w/2;
+let cx=offsetX+coins[i].lane*laneWidth+laneWidth/2;
+if(player.lane===coins[i].lane&&player.y<coins[i].y+coins[i].r&&player.y+player.h>coins[i].y-coins[i].r){
+coins.splice(i,1);
+score+=5;
+scoreEl.innerText=score;
+continue;
+}
+if(coins[i].y>canvas.height+50) coins.splice(i,1);
+}
+
+for(let i=obstacles.length-1;i>=0;i--){
+obstacles[i].update();
+obstacles[i].draw();
+if(obstacles[i].lane===player.lane){
+if(player.y<obstacles[i].y+obstacles[i].h&&player.y+player.h>obstacles[i].y){
+state='GAMEOVER';
+gameOverEl.style.display='block';
+}
+}
+if(obstacles[i].y>canvas.height){
+obstacles.splice(i,1);
+score++;
+scoreEl.innerText=score;
+}
+}
+}else if(state==='GAMEOVER'){
+for(let i=0;i<coins.length;i++) coins[i].draw();
+for(let i=0;i<obstacles.length;i++) obstacles[i].draw();
+}
+
+let px=offsetX+player.lane*laneWidth+laneWidth/2-player.w/2;
+ctx.fillStyle='#0fbcf9';
+ctx.fillRect(px,player.y,player.w,player.h);
+}
+
+animate();
+</script>
+</body>
+</html>

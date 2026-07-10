@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<style>
+body{margin:0;overflow:hidden;background-color:#2c3e50;font-family:sans-serif;}
+canvas{display:block;}
+#ui{position:absolute;top:20px;left:20px;font-size:24px;font-weight:bold;color:#ecf0f1;pointer-events:none;}
+.screen{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:32px;color:#ecf0f1;text-align:center;pointer-events:none;}
+#gameOver{display:none;}
+#instruction{position:absolute;bottom:20px;width:100%;text-align:center;font-size:16px;color:#bdc3c7;pointer-events:none;}
+</style>
+</head>
+<body>
+<div id="ui">Score: <span id="score">0</span></div>
+<div id="readyScreen" class="screen">Ready?<br><span style="font-size:20px">點擊畫面開始</span></div>
+<div id="gameOver" class="screen">Game Over<br><span style="font-size:20px">點擊畫面重置</span></div>
+<div id="instruction">操作教學：左右移動滑鼠躲避上方掉落的方塊</div>
+<canvas id="gameCanvas"></canvas>
+<script>
+const canvas=document.getElementById('gameCanvas');
+const ctx=canvas.getContext('2d');
+const scoreEl=document.getElementById('score');
+const readyEl=document.getElementById('readyScreen');
+const gameOverEl=document.getElementById('gameOver');
+canvas.width=window.innerWidth;
+canvas.height=window.innerHeight;
+
+let state='READY';
+let score=0;
+let frames=0;
+let blocks=[];
+let player={w:30,h:30,x:canvas.width/2-15,y:canvas.height-150};
+
+class Block{
+constructor(){
+this.w=Math.random()*80+20;
+this.h=Math.random()*30+10;
+this.x=Math.random()*(canvas.width-this.w);
+this.y=-this.h;
+this.speed=Math.random()*4+3+(score*0.002);
+this.color=`hsl(${Math.random()*60},80%,60%)`;
+}
+update(){
+this.y+=this.speed;
+}
+draw(){
+ctx.fillStyle=this.color;
+ctx.fillRect(this.x,this.y,this.w,this.h);
+}
+}
+
+function resetGame(){
+blocks=[];
+score=0;
+scoreEl.innerText=score;
+frames=0;
+player.x=canvas.width/2-player.w/2;
+state='READY';
+gameOverEl.style.display='none';
+readyEl.style.display='block';
+}
+
+window.addEventListener('mousemove',function(e){
+if(state==='PLAYING'||state==='READY'){
+let relativeX=e.clientX;
+if(relativeX>player.w/2&&relativeX<canvas.width-player.w/2){
+player.x=relativeX-player.w/2;
+}
+}
+});
+
+function handleInput(){
+if(state==='READY'){
+state='PLAYING';
+readyEl.style.display='none';
+}else if(state==='GAMEOVER'){
+resetGame();
+}
+}
+
+window.addEventListener('mousedown',handleInput);
+window.addEventListener('touchstart',handleInput);
+
+function checkCollision(r1,r2){
+return r1.x<r2.x+r2.w&&r1.x+r1.w>r2.x&&r1.y<r2.y+r2.h&&r1.y+r1.h>r2.y;
+}
+
+function animate(){
+requestAnimationFrame(animate);
+ctx.clearRect(0,0,canvas.width,canvas.height);
+
+ctx.fillStyle='#3498db';
+ctx.fillRect(player.x,player.y,player.w,player.h);
+
+if(state==='PLAYING'){
+score++;
+scoreEl.innerText=score;
+frames++;
+
+let spawnRate=Math.max(10,40-Math.floor(score/50));
+if(frames%spawnRate===0){
+blocks.push(new Block());
+}
+
+for(let i=blocks.length-1;i>=0;i--){
+blocks[i].update();
+blocks[i].draw();
+
+if(checkCollision(player,blocks[i])){
+state='GAMEOVER';
+gameOverEl.style.display='block';
+}
+
+if(blocks[i].y>canvas.height){
+blocks.splice(i,1);
+}
+}
+}else if(state==='GAMEOVER'){
+for(let i=0;i<blocks.length;i++){
+blocks[i].draw();
+}
+}
+}
+
+animate();
+
+window.addEventListener('resize',function(){
+canvas.width=window.innerWidth;
+canvas.height=window.innerHeight;
+player.y=canvas.height-150;
+if(player.x>canvas.width-player.w) player.x=canvas.width-player.w;
+});
+</script>
+</body>
+</html>

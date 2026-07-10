@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<style>
+body{margin:0;overflow:hidden;background-color:#70c5ce;font-family:sans-serif;}
+canvas{display:block;}
+#ui{position:absolute;top:20px;left:20px;font-size:24px;font-weight:bold;color:#fff;pointer-events:none;text-shadow:2px 2px 0 #000;}
+.screen{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:32px;color:#fff;text-align:center;pointer-events:none;text-shadow:2px 2px 0 #000;}
+#gameOver{display:none;}
+#instruction{position:absolute;bottom:20px;width:100%;text-align:center;font-size:16px;color:#fff;pointer-events:none;text-shadow:1px 1px 0 #000;}
+</style>
+</head>
+<body>
+<div id="ui">Score: <span id="score">0</span></div>
+<div id="readyScreen" class="screen">Ready?<br><span style="font-size:20px">點擊畫面或按空白鍵開始</span></div>
+<div id="gameOver" class="screen">Game Over<br><span style="font-size:20px">點擊或按空白鍵重置</span></div>
+<div id="instruction">操作教學：點擊畫面或按空白鍵保持飛行</div>
+<canvas id="gameCanvas"></canvas>
+<script>
+const canvas=document.getElementById('gameCanvas');
+const ctx=canvas.getContext('2d');
+const scoreEl=document.getElementById('score');
+const readyEl=document.getElementById('readyScreen');
+const gameOverEl=document.getElementById('gameOver');
+canvas.width=window.innerWidth;
+canvas.height=window.innerHeight;
+
+let state='READY';
+let score=0;
+let frames=0;
+let pipes=[];
+const gravity=0.5;
+
+class Bird{
+constructor(){
+this.x=canvas.width*0.2;
+this.y=canvas.height/2;
+this.size=15;
+this.vy=0;
+this.jumpForce=-8;
+}
+jump(){
+this.vy=this.jumpForce;
+}
+update(){
+this.vy+=gravity;
+this.y+=this.vy;
+}
+draw(){
+ctx.fillStyle='#f1c40f';
+ctx.beginPath();
+ctx.arc(this.x,this.y,this.size,0,Math.PI*2);
+ctx.fill();
+}
+}
+
+class Pipe{
+constructor(){
+this.w=60;
+this.x=canvas.width;
+this.gap=150;
+this.topH=Math.random()*(canvas.height-this.gap-100)+50;
+this.bottomY=this.topH+this.gap;
+this.bottomH=canvas.height-this.bottomY;
+this.speed=4;
+this.passed=false;
+}
+update(){
+this.x-=this.speed;
+}
+draw(){
+ctx.fillStyle='#2ecc71';
+ctx.fillRect(this.x,0,this.w,this.topH);
+ctx.fillRect(this.x,this.bottomY,this.w,this.bottomH);
+}
+}
+
+let bird=new Bird();
+
+function resetGame(){
+pipes=[];
+score=0;
+scoreEl.innerText=score;
+frames=0;
+bird=new Bird();
+state='READY';
+gameOverEl.style.display='none';
+readyEl.style.display='block';
+}
+
+function checkCollision(b,p){
+const cx=b.x;
+const cy=b.y;
+const r=b.size;
+let hitTop=cx+r>p.x&&cx-r<p.x+p.w&&cy-r<p.topH;
+let hitBottom=cx+r>p.x&&cx-r<p.x+p.w&&cy+r>p.bottomY;
+let hitGround=cy+r>=canvas.height;
+let hitCeiling=cy-r<=0;
+return hitTop||hitBottom||hitGround||hitCeiling;
+}
+
+function handleInput(){
+if(state==='READY'){
+state='PLAYING';
+readyEl.style.display='none';
+bird.jump();
+}else if(state==='PLAYING'){
+bird.jump();
+}else if(state==='GAMEOVER'){
+resetGame();
+}
+}
+
+window.addEventListener('keydown',function(e){
+if(e.code==='Space') handleInput();
+});
+window.addEventListener('mousedown',handleInput);
+window.addEventListener('touchstart',handleInput);
+
+function animate(){
+requestAnimationFrame(animate);
+ctx.clearRect(0,0,canvas.width,canvas.height);
+
+if(state==='READY'){
+bird.draw();
+}else if(state==='PLAYING'){
+bird.update();
+bird.draw();
+
+if(frames%100===0) pipes.push(new Pipe());
+
+for(let i=pipes.length-1;i>=0;i--){
+pipes[i].update();
+pipes[i].draw();
+
+if(checkCollision(bird,pipes[i])){
+state='GAMEOVER';
+gameOverEl.style.display='block';
+}
+
+if(pipes[i].x+pipes[i].w<bird.x-bird.size&&!pipes[i].passed){
+score++;
+scoreEl.innerText=score;
+pipes[i].passed=true;
+}
+
+if(pipes[i].x+pipes[i].w<0) pipes.splice(i,1);
+}
+frames++;
+}else if(state==='GAMEOVER'){
+bird.draw();
+for(let i=0;i<pipes.length;i++) pipes[i].draw();
+}
+}
+
+animate();
+
+window.addEventListener('resize',function(){
+canvas.width=window.innerWidth;
+canvas.height=window.innerHeight;
+});
+</script>
+</body>
+</html>

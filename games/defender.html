@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<style>
+body{margin:0;overflow:hidden;background-color:#1e272e;font-family:sans-serif;}
+canvas{display:block;}
+#ui{position:absolute;top:20px;left:20px;font-size:24px;font-weight:bold;color:#d2dae2;pointer-events:none;}
+.screen{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:32px;color:#d2dae2;text-align:center;pointer-events:none;}
+#gameOver{display:none;}
+#instruction{position:absolute;bottom:20px;width:100%;text-align:center;font-size:16px;color:#808e9b;pointer-events:none;}
+</style>
+</head>
+<body>
+<div id="ui">Score: <span id="score">0</span></div>
+<div id="readyScreen" class="screen">Ready?<br><span style="font-size:20px">點擊畫面開始防禦</span></div>
+<div id="gameOver" class="screen">Core Destroyed<br><span style="font-size:20px">點擊畫面重置</span></div>
+<div id="instruction">操作教學：點擊逼近的紅色目標，保護中央藍色核心</div>
+<canvas id="gameCanvas"></canvas>
+<script>
+const canvas=document.getElementById('gameCanvas');
+const ctx=canvas.getContext('2d');
+const scoreEl=document.getElementById('score');
+const readyEl=document.getElementById('readyScreen');
+const gameOverEl=document.getElementById('gameOver');
+canvas.width=window.innerWidth;
+canvas.height=window.innerHeight;
+
+let state='READY';
+let score=0;
+let frames=0;
+let enemies=[];
+let core={x:canvas.width/2,y:canvas.height/2,r:25};
+
+class Enemy{
+constructor(){
+this.r=15+Math.random()*10;
+let angle=Math.random()*Math.PI*2;
+let dist=Math.max(canvas.width,canvas.height);
+this.x=core.x+Math.cos(angle)*dist;
+this.y=core.y+Math.sin(angle)*dist;
+let angleToCore=Math.atan2(core.y-this.y,core.x-this.x);
+let speed=3.5+(score*0.15);
+this.dx=Math.cos(angleToCore)*speed;
+this.dy=Math.sin(angleToCore)*speed;
+}
+update(){
+this.x+=this.dx;
+this.y+=this.dy;
+}
+draw(){
+ctx.beginPath();
+ctx.arc(this.x,this.y,this.r,0,Math.PI*2);
+ctx.fillStyle='#ff3f34';
+ctx.fill();
+}
+}
+
+function resetGame(){
+enemies=[];
+score=0;
+scoreEl.innerText=score;
+frames=0;
+core.x=canvas.width/2;
+core.y=canvas.height/2;
+state='READY';
+gameOverEl.style.display='none';
+readyEl.style.display='block';
+}
+
+function handleInput(e){
+if(state==='READY'){
+state='PLAYING';
+readyEl.style.display='none';
+return;
+}
+if(state==='GAMEOVER'){
+resetGame();
+return;
+}
+if(state==='PLAYING'){
+let rect=canvas.getBoundingClientRect();
+let clientX=e.clientX||(e.touches?e.touches[0].clientX:0);
+let clientY=e.clientY||(e.touches?e.touches[0].clientY:0);
+let mouseX=clientX-rect.left;
+let mouseY=clientY-rect.top;
+
+for(let i=enemies.length-1;i>=0;i--){
+let d=Math.hypot(mouseX-enemies[i].x,mouseY-enemies[i].y);
+if(d<enemies[i].r){
+enemies.splice(i,1);
+score++;
+scoreEl.innerText=score;
+break;
+}
+}
+}
+}
+
+window.addEventListener('mousedown',handleInput);
+window.addEventListener('touchstart',handleInput);
+
+function animate(){
+requestAnimationFrame(animate);
+ctx.fillStyle='rgba(30,39,46,0.3)';
+ctx.fillRect(0,0,canvas.width,canvas.height);
+
+ctx.beginPath();
+ctx.arc(core.x,core.y,core.r,0,Math.PI*2);
+ctx.fillStyle='#0fbcf9';
+ctx.fill();
+ctx.strokeStyle='#d2dae2';
+ctx.lineWidth=2;
+ctx.stroke();
+
+if(state==='PLAYING'){
+frames++;
+
+let spawnRate=Math.max(8,45-score);
+if(frames%spawnRate===0){
+enemies.push(new Enemy());
+}
+
+for(let i=enemies.length-1;i>=0;i--){
+enemies[i].update();
+enemies[i].draw();
+
+let d=Math.hypot(core.x-enemies[i].x,core.y-enemies[i].y);
+if(d<core.r+enemies[i].r){
+state='GAMEOVER';
+gameOverEl.style.display='block';
+}
+}
+}else if(state==='GAMEOVER'){
+for(let i=0;i<enemies.length;i++){
+enemies[i].draw();
+}
+}
+}
+
+animate();
+
+window.addEventListener('resize',function(){
+canvas.width=window.innerWidth;
+canvas.height=window.innerHeight;
+core.x=canvas.width/2;
+core.y=canvas.height/2;
+});
+</script>
+</body>
+</html>

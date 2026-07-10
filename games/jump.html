@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<style>
+body{margin:0;overflow:hidden;background-color:#f4f1ea;font-family:sans-serif;}
+canvas{display:block;}
+#ui{position:absolute;top:20px;left:20px;font-size:24px;font-weight:bold;color:#2c3e50;pointer-events:none;}
+.screen{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:32px;color:#2c3e50;text-align:center;pointer-events:none;}
+#gameOver{display:none;}
+#instruction{position:absolute;bottom:20px;width:100%;text-align:center;font-size:16px;color:#7f8c8d;pointer-events:none;}
+</style>
+</head>
+<body>
+<div id="ui">Floor: <span id="score">0</span></div>
+<div id="readyScreen" class="screen">Ready?<br><span style="font-size:20px">點擊畫面起跳</span></div>
+<div id="gameOver" class="screen">Fallen<br><span style="font-size:20px">點擊重置</span></div>
+<div id="instruction">操作教學：看準時機點擊畫面，跳向移動中的平台</div>
+<canvas id="gameCanvas"></canvas>
+<script>
+const canvas=document.getElementById('gameCanvas');
+const ctx=canvas.getContext('2d');
+const scoreEl=document.getElementById('score');
+const readyEl=document.getElementById('readyScreen');
+const gameOverEl=document.getElementById('gameOver');
+canvas.width=window.innerWidth;
+canvas.height=window.innerHeight;
+
+let state='READY';
+let score=0;
+let platforms=[];
+let player={w:20,h:20,x:0,y:0,vy:0,isJumping:false};
+const gapY=120;
+const gravity=0.5;
+const jumpForce=-12;
+let shiftTarget=0;
+
+class Platform{
+constructor(y,speedMulti){
+this.w=80;
+this.h=15;
+this.x=Math.random()*(canvas.width-this.w);
+this.y=y;
+this.dx=(Math.random()>0.5?1:-1)*(2+Math.random()*2+speedMulti);
+}
+update(){
+this.x+=this.dx;
+if(this.x<0||this.x+this.w>canvas.width) this.dx*=-1;
+}
+draw(){
+ctx.fillStyle='#2ecc71';
+ctx.fillRect(this.x,this.y,this.w,this.h);
+}
+}
+
+function initPlatforms(){
+platforms=[];
+platforms.push(new Platform(canvas.height-100,0));
+platforms.push(new Platform(canvas.height-100-gapY,0));
+platforms.push(new Platform(canvas.height-100-gapY*2,0));
+platforms.push(new Platform(canvas.height-100-gapY*3,0));
+}
+
+function resetGame(){
+initPlatforms();
+player.isJumping=false;
+score=0;
+scoreEl.innerText=score;
+shiftTarget=0;
+state='READY';
+gameOverEl.style.display='none';
+readyEl.style.display='block';
+}
+
+resetGame();
+
+function handleInput(){
+if(state==='READY'){
+state='PLAYING';
+readyEl.style.display='none';
+}else if(state==='GAMEOVER'){
+resetGame();
+}else if(state==='PLAYING'&&!player.isJumping&&shiftTarget===0){
+player.vy=jumpForce;
+player.isJumping=true;
+}
+}
+
+window.addEventListener('mousedown',handleInput);
+window.addEventListener('touchstart',handleInput);
+
+function animate(){
+requestAnimationFrame(animate);
+ctx.fillStyle='#f4f1ea';
+ctx.fillRect(0,0,canvas.width,canvas.height);
+
+if(state!=='GAMEOVER'){
+for(let i=0;i<platforms.length;i++){
+platforms[i].update();
+platforms[i].draw();
+}
+
+if(shiftTarget>0){
+let step=Math.min(shiftTarget,10);
+shiftTarget-=step;
+player.y+=step;
+for(let i=0;i<platforms.length;i++) platforms[i].y+=step;
+}
+
+if(!player.isJumping){
+player.x=platforms[0].x+platforms[0].w/2-player.w/2;
+player.y=platforms[0].y-player.h;
+}else{
+player.vy+=gravity;
+player.y+=player.vy;
+if(player.vy>0){
+let p=platforms[1];
+if(player.y+player.h>p.y&&player.y+player.h-player.vy<=p.y&&player.x+player.w>p.x&&player.x<p.x+p.w){
+player.isJumping=false;
+player.y=p.y-player.h;
+score++;
+scoreEl.innerText=score;
+shiftTarget=gapY;
+platforms.push(new Platform(platforms[platforms.length-1].y-gapY,score*0.2));
+platforms.shift();
+}
+}
+}
+
+if(player.y>canvas.height){
+state='GAMEOVER';
+gameOverEl.style.display='block';
+}
+
+ctx.fillStyle='#3498db';
+ctx.fillRect(player.x,player.y,player.w,player.h);
+}else{
+for(let i=0;i<platforms.length;i++) platforms[i].draw();
+ctx.fillStyle='#3498db';
+ctx.fillRect(player.x,player.y,player.w,player.h);
+}
+}
+
+animate();
+
+window.addEventListener('resize',function(){
+canvas.width=window.innerWidth;
+canvas.height=window.innerHeight;
+});
+</script>
+</body>
+</html>

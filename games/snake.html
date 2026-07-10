@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<style>
+body{margin:0;overflow:hidden;background-color:#222;font-family:sans-serif;}
+canvas{display:block;}
+#ui{position:absolute;top:20px;left:20px;font-size:24px;font-weight:bold;color:#fff;pointer-events:none;}
+.screen{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:32px;color:#fff;text-align:center;pointer-events:none;}
+#gameOver{display:none;color:#e74c3c;}
+#instruction{position:absolute;bottom:20px;width:100%;text-align:center;font-size:16px;color:#aaa;pointer-events:none;}
+</style>
+</head>
+<body>
+<div id="ui">Score: <span id="score">0</span></div>
+<div id="readyScreen" class="screen">Ready?<br><span style="font-size:20px">按任意方向鍵開始</span></div>
+<div id="gameOver" class="screen">Game Over<br><span style="font-size:20px">按空白鍵重置</span></div>
+<div id="instruction">操作教學：使用鍵盤方向鍵控制移動，吃掉紅色食物</div>
+<canvas id="gameCanvas"></canvas>
+<script>
+const canvas=document.getElementById('gameCanvas');
+const ctx=canvas.getContext('2d');
+const scoreEl=document.getElementById('score');
+const readyEl=document.getElementById('readyScreen');
+const gameOverEl=document.getElementById('gameOver');
+
+const gridSize=20;
+canvas.width=Math.floor(window.innerWidth/gridSize)*gridSize;
+canvas.height=Math.floor(window.innerHeight/gridSize)*gridSize;
+
+let state='READY';
+let score=0;
+let frames=0;
+let snake=[];
+let food={x:0,y:0};
+let dx=0;
+let dy=0;
+let nextDx=0;
+let nextDy=0;
+
+function spawnFood(){
+let valid=false;
+while(!valid){
+food.x=Math.floor(Math.random()*(canvas.width/gridSize))*gridSize;
+food.y=Math.floor(Math.random()*(canvas.height/gridSize))*gridSize;
+valid=true;
+for(let i=0;i<snake.length;i++){
+if(snake[i].x===food.x&&snake[i].y===food.y){
+valid=false;
+break;
+}
+}
+}
+}
+
+function resetGame(){
+let startX=Math.floor((canvas.width/2)/gridSize)*gridSize;
+let startY=Math.floor((canvas.height/2)/gridSize)*gridSize;
+snake=[{x:startX,y:startY}];
+score=0;
+scoreEl.innerText=score;
+dx=0;
+dy=0;
+nextDx=0;
+nextDy=0;
+spawnFood();
+state='READY';
+gameOverEl.style.display='none';
+readyEl.style.display='block';
+}
+
+resetGame();
+
+window.addEventListener('keydown',function(e){
+if(state==='READY'){
+if(e.key.startsWith('Arrow')){
+state='PLAYING';
+readyEl.style.display='none';
+}
+}
+if(state==='GAMEOVER'&&e.code==='Space'){
+resetGame();
+return;
+}
+if(e.key==='ArrowUp'&&dy===0){
+nextDx=0;
+nextDy=-gridSize;
+}else if(e.key==='ArrowDown'&&dy===0){
+nextDx=0;
+nextDy=gridSize;
+}else if(e.key==='ArrowLeft'&&dx===0){
+nextDx=-gridSize;
+nextDy=0;
+}else if(e.key==='ArrowRight'&&dx===0){
+nextDx=gridSize;
+nextDy=0;
+}
+});
+
+function animate(){
+requestAnimationFrame(animate);
+if(state!=='PLAYING'){
+if(state==='GAMEOVER'){
+ctx.fillStyle='rgba(34,34,34,0.1)';
+ctx.fillRect(0,0,canvas.width,canvas.height);
+}
+return;
+}
+
+frames++;
+if(frames%Math.max(3,Math.floor(10-score*0.1))!==0) return;
+
+ctx.clearRect(0,0,canvas.width,canvas.height);
+
+dx=nextDx;
+dy=nextDy;
+
+let head={x:snake[0].x+dx,y:snake[0].y+dy};
+
+if(head.x<0||head.x>=canvas.width||head.y<0||head.y>=canvas.height){
+state='GAMEOVER';
+gameOverEl.style.display='block';
+return;
+}
+
+for(let i=0;i<snake.length;i++){
+if(head.x===snake[i].x&&head.y===snake[i].y){
+state='GAMEOVER';
+gameOverEl.style.display='block';
+return;
+}
+}
+
+snake.unshift(head);
+
+if(head.x===food.x&&head.y===food.y){
+score++;
+scoreEl.innerText=score;
+spawnFood();
+}else{
+snake.pop();
+}
+
+ctx.fillStyle='#e74c3c';
+ctx.fillRect(food.x,food.y,gridSize,gridSize);
+
+for(let i=0;i<snake.length;i++){
+ctx.fillStyle=i===0?'#2ecc71':'#27ae60';
+ctx.fillRect(snake[i].x,snake[i].y,gridSize,gridSize);
+}
+}
+
+animate();
+
+window.addEventListener('resize',function(){
+let newWidth=Math.floor(window.innerWidth/gridSize)*gridSize;
+let newHeight=Math.floor(window.innerHeight/gridSize)*gridSize;
+canvas.width=newWidth;
+canvas.height=newHeight;
+if(state==='READY') resetGame();
+});
+</script>
+</body>
+</html>

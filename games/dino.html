@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<style>
+body{margin:0;overflow:hidden;background-color:#eee;font-family:sans-serif;}
+canvas{display:block;}
+#ui{position:absolute;top:20px;left:20px;font-size:24px;font-weight:bold;color:#333;pointer-events:none;}
+#gameOver{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:32px;color:#d32f2f;display:none;text-align:center;pointer-events:none;}
+#instruction{position:absolute;bottom:20px;width:100%;text-align:center;font-size:16px;color:#666;pointer-events:none;}
+</style>
+</head>
+<body>
+<div id="ui">Score: <span id="score">0</span></div>
+<div id="gameOver">Game Over<br><span style="font-size:20px">點擊或按空白鍵重新開始</span></div>
+<div id="instruction">操作教學：按下 [空白鍵] 或 [點擊畫面] 進行跳躍</div>
+<canvas id="gameCanvas"></canvas>
+<script>
+const canvas=document.getElementById('gameCanvas');
+const ctx=canvas.getContext('2d');
+const scoreEl=document.getElementById('score');
+const gameOverEl=document.getElementById('gameOver');
+canvas.width=window.innerWidth;
+canvas.height=window.innerHeight;
+
+let score=0;
+let frames=0;
+let gameActive=true;
+let obstacles=[];
+let baseSpeed=6;
+const gravity=0.6;
+
+class Dino{
+constructor(){
+this.w=40;
+this.h=40;
+this.x=50;
+this.y=canvas.height-this.h;
+this.vy=0;
+this.jumpForce=-12;
+this.isJumping=false;
+}
+jump(){
+if(!this.isJumping){
+this.vy=this.jumpForce;
+this.isJumping=true;
+}
+}
+update(){
+this.vy+=gravity;
+this.y+=this.vy;
+if(this.y+this.h>=canvas.height){
+this.y=canvas.height-this.h;
+this.vy=0;
+this.isJumping=false;
+}
+}
+draw(){
+ctx.fillStyle='#333';
+ctx.fillRect(this.x,this.y,this.w,this.h);
+}
+}
+
+class Obstacle{
+constructor(){
+this.w=20+Math.random()*20;
+this.h=30+Math.random()*40;
+this.x=canvas.width;
+this.y=canvas.height-this.h;
+this.speed=baseSpeed+(score*0.1);
+}
+update(){
+this.x-=this.speed;
+}
+draw(){
+ctx.fillStyle='#d32f2f';
+ctx.fillRect(this.x,this.y,this.w,this.h);
+}
+}
+
+let dino=new Dino();
+
+function resetGame(){
+if(gameActive) return;
+obstacles=[];
+score=0;
+scoreEl.innerText=score;
+frames=0;
+dino=new Dino();
+gameActive=true;
+gameOverEl.style.display='none';
+animate();
+}
+
+function checkCollision(r1,r2){
+return r1.x<r2.x+r2.w&&r1.x+r1.w>r2.x&&r1.y<r2.y+r2.h&&r1.y+r1.h>r2.y;
+}
+
+function triggerJump(){
+if(gameActive){
+dino.jump();
+}else{
+resetGame();
+}
+}
+
+window.addEventListener('keydown',function(e){
+if(e.code==='Space') triggerJump();
+});
+window.addEventListener('mousedown',triggerJump);
+window.addEventListener('touchstart',triggerJump);
+
+function animate(){
+if(!gameActive) return;
+ctx.clearRect(0,0,canvas.width,canvas.height);
+
+dino.update();
+dino.draw();
+
+if(frames%80===0){
+obstacles.push(new Obstacle());
+}
+
+for(let i=obstacles.length-1;i>=0;i--){
+obstacles[i].update();
+obstacles[i].draw();
+if(checkCollision(dino,obstacles[i])){
+gameActive=false;
+gameOverEl.style.display='block';
+}
+if(obstacles[i].x+obstacles[i].w<0){
+obstacles.splice(i,1);
+score++;
+scoreEl.innerText=score;
+}
+}
+frames++;
+
+if(gameActive) requestAnimationFrame(animate);
+}
+
+animate();
+
+window.addEventListener('resize',function(){
+canvas.width=window.innerWidth;
+canvas.height=window.innerHeight;
+if(!dino.isJumping) dino.y=canvas.height-dino.h;
+});
+</script>
+</body>
+</html>

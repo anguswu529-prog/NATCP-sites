@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<style>
+body{margin:0;overflow:hidden;background-color:#1e272e;font-family:sans-serif;user-select:none;touch-action:none;}
+canvas{display:block;}
+#ui{position:absolute;top:20px;left:20px;font-size:24px;font-weight:bold;color:#d2dae2;pointer-events:none;}
+.screen{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:32px;color:#d2dae2;text-align:center;pointer-events:none;}
+#gameOver{display:none;}
+#instruction{position:absolute;bottom:20px;width:100%;text-align:center;font-size:16px;color:#808e9b;pointer-events:none;}
+</style>
+</head>
+<body>
+<div id="ui">Score: <span id="score">0</span> | Cities: <span id="cities">3</span></div>
+<div id="readyScreen" class="screen">Ready?<br><span style="font-size:20px">點擊畫面開始防禦</span></div>
+<div id="gameOver" class="screen">Base Destroyed<br><span style="font-size:20px">點擊畫面重置</span></div>
+<div id="instruction">操作教學：點擊畫面發射防禦飛彈，利用爆炸波攔截紅色威脅</div>
+<canvas id="gameCanvas"></canvas>
+<script>
+const canvas=document.getElementById('gameCanvas');
+const ctx=canvas.getContext('2d');
+const scoreEl=document.getElementById('score');
+const citiesEl=document.getElementById('cities');
+const readyEl=document.getElementById('readyScreen');
+const gameOverEl=document.getElementById('gameOver');
+canvas.width=window.innerWidth;
+canvas.height=window.innerHeight;
+
+let state='READY';
+let score=0;
+let frames=0;
+let cityCount=3;
+let enemies=[];
+let missiles=[];
+let explosions=[];
+let battery={x:canvas.width/2,y:canvas.height-30};
+
+class Enemy{
+constructor(){
+this.x=Math.random()*canvas.width;
+this.y=-10;
+this.tx=Math.random()*canvas.width;
+this.ty=canvas.height;
+let angle=Math.atan2(this.ty-this.y,this.tx-this.x);
+let speed=1.5+(score*0.05);
+this.dx=Math.cos(angle)*speed;
+this.dy=Math.sin(angle)*speed;
+this.active=true;
+}
+update(){
+this.x+=this.dx;
+this.y+=this.dy;
+if(this.y>=canvas.height) this.active=false;
+}
+draw(){
+ctx.beginPath();
+ctx.moveTo(this.x,this.y);
+ctx.lineTo(this.x-this.dx*4,this.y-this.dy*4);
+ctx.strokeStyle='#ff3f34';
+ctx.lineWidth=3;
+ctx.stroke();
+ctx.beginPath();
+ctx.arc(this.x,this.y,3,0,Math.PI*2);
+ctx.fillStyle='#ff3f34';
+ctx.fill();
+}
+}
+
+class Missile{
+constructor(tx,ty){
+this.x=battery.x;
+this.y=battery.y;
+this.tx=tx;
+this.ty=ty;
+let angle=Math.atan2(this.ty-this.y,this.tx-this.x);
+let speed=12;
+this.dx=Math.cos(angle)*speed;
+this.dy=Math.sin(angle)*speed;
+this.active=true;
+}
+update(){
+this.x+=this.dx;
+this.y+=this.dy;
+if(Math.hypot(this.x-this.tx,this.y-this.ty)<15) this.active=false;
+}
+draw(){
+ctx.beginPath();
+ctx.arc(this.x,this.y,2,0,Math.PI*2);
+ctx.fillStyle='#0fbcf9';
+ctx.fill();
+ctx.beginPath();
+ctx.moveTo(this.x,this.y);
+ctx.lineTo(battery.x,battery.y);
+ctx.strokeStyle='rgba(15,188,249,0.3)';
+ctx.lineWidth=1;
+ctx.stroke();
+}
+}
+
+class Explosion{
+constructor(x,y){
+this.x=x;
+this.y=y;
+this.r=1;
+this.maxR=40;
+this.dr=1.5;
+this.active=true;
+}
+update(){
+this.r+=this.dr;
+if(this.r>=this.maxR) this.active=false;
+}
+draw(){
+ctx.beginPath();
+ctx.arc(this.x,this.y,this.r,0,Math.PI*2);
+ctx.fillStyle=`rgba(15,188,249,${1-this.r/this.maxR})`;
+ctx.fill();
+}
+}
+
+function resetGame(){
+enemies=[];
+missiles=[];
+explosions=[];
+score=0;
+cityCount=3;
+scoreEl.innerText=score;
+citiesEl.innerText=cityCount;
+frames=0;
+battery.x=canvas.width/2;
+battery.y=canvas.height-30;
+state='READY';
+gameOverEl.style.display='none';
+readyEl.style.display='block';
+}
+
+function handleInput(e){
+if(state==='READY'){
+state='PLAYING';
+readyEl.style.display='none';
+return;
+}
+if(state==='GAMEOVER'){
+resetGame();
+return;
+}
+if(state==='PLAYING'){
+let rect=canvas.getBoundingClientRect();
+let clientX=e.clientX||(e.touches?e.touches[0].clientX:0);
+let clientY=e.clientY||(e.touches?e.touches[0].clientY:0);
+missiles.push(new Missile(clientX-rect.left,clientY-rect.top));
+}
+}
+
+window.addEventListener('mousedown',handleInput);
+window.addEventListener('touchstart',handleInput);
+
+function animate(){
+requestAnimationFrame(animate);
+ctx.fillStyle='rgba(30,39,46,0.4)';
+ctx.fillRect(0,0,canvas.width,canvas.height);
+
+ctx.fillStyle='#808e9b';
+ctx.fillRect(battery.x-15,battery.y,30,30);
+ctx.beginPath();
+ctx.arc(battery.x,battery.y,15,Math.PI,0);
+ctx.fill();
+
+if(state==='PLAYING'){
+frames++;
+let spawnRate=Math.max(25,90-Math.floor(score/3));
+if(frames%spawnRate===0) enemies.push(new Enemy());
+
+for(let i=missiles.length-1;i>=0;i--){
+missiles[i].update();
+missiles[i].draw();
+if(!missiles[i].active){
+explosions.push(new Explosion(missiles[i].x,missiles[i].y));
+missiles.splice(i,1);
+}
+}
+
+for(let i=explosions.length-1;i>=0;i--){
+explosions[i].update();
+explosions[i].draw();
+if(!explosions[i].active) explosions.splice(i,1);
+}
+
+for(let i=enemies.length-1;i>=0;i--){
+enemies[i].update();
+enemies[i].draw();
+
+let destroyed=false;
+for(let j=0;j<explosions.length;j++){
+if(Math.hypot(enemies[i].x-explosions[j].x,enemies[i].y-explosions[j].y)<explosions[j].r){
+destroyed=true;
+break;
+}
+}
+
+if(destroyed){
+score++;
+scoreEl.innerText=score;
+explosions.push(new Explosion(enemies[i].x,enemies[i].y));
+enemies.splice(i,1);
+continue;
+}
+
+if(!enemies[i].active){
+cityCount--;
+citiesEl.innerText=cityCount;
+explosions.push(new Explosion(enemies[i].x,enemies[i].y));
+enemies.splice(i,1);
+if(cityCount<=0){
+state='GAMEOVER';
+gameOverEl.style.display='block';
+}
+}
+}
+}else if(state==='GAMEOVER'){
+for(let i=0;i<enemies.length;i++) enemies[i].draw();
+for(let i=0;i<explosions.length;i++) explosions[i].draw();
+}
+}
+
+animate();
+
+window.addEventListener('resize',function(){
+canvas.width=window.innerWidth;
+canvas.height=window.innerHeight;
+battery.x=canvas.width/2;
+battery.y=canvas.height-30;
+});
+</script>
+</body>
+</html>
